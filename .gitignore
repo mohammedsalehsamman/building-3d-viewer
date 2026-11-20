@@ -1,0 +1,32 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Private survey material (parcel map PDF + photos) — do not publish
+*.pdf
+photo_*.jpg
+photo_*.jpeg
+photo_*.png
+
+# Generated previews
+plans.html
+
+# Logs
+*.log
+npm-debug.log*
+
+# Env / secrets
+.env
+.env.*
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Claude Code local settings
+.claude/

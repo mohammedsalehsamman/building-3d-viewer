@@ -1,0 +1,21 @@
+{
+  "name": "mahdar-2310-4",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "solve": "node scripts/solve-parcel.mjs",
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "check": "node scripts/check-layouts.mjs"
+  },
+  "dependencies": {
+    "polygon-clipping": "^0.15.7",
+    "three": "^0.170.0"
+  },
+  "devDependencies": {
+    "vite": "^6.0.0",
+    "vite-plugin-singlefile": "^2.1.0"
+  }
+}

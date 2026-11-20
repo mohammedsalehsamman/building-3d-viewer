@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>مبنى المحضر 2310/4</title>
+    <meta name="description" content="نموذج ثلاثي الأبعاد تفاعلي لمبنى من 9 طوابق على المحضر 2310/4: باركينغ، سوق تجاري، مكاتب، استوديوهات ومقهى على السطح." />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/src/ui/styles.css" />
+  </head>
+  <body>
+    <div id="viewport"></div>
+
+    <header id="topbar">
+      <div class="brand">
+        <div class="brand-title">مبنى المحضر 2310/4</div>
+        <div class="brand-sub">529 م² · 9 طوابق + سطح · نموذج تفاعلي</div>
+      </div>
+      <nav id="toolbar" aria-label="أدوات العرض"></nav>
+    </header>
+
+    <aside id="floors" class="card" aria-label="الطوابق"></aside>
+
+    <section id="info" class="card hidden" aria-live="polite"></section>
+    <div id="tooltip" class="hidden"></div>
+
+    <div id="panel-sun" class="card float-panel hidden"></div>
+    <div id="panel-section" class="card float-panel hidden"></div>
+    <div id="panel-layers" class="card float-panel hidden"></div>
+
+    <div id="legend" class="card"></div>
+    <div id="compass" title="اتجاه الشمال"><div class="needle"></div><span>N</span></div>
+
+    <div id="schedule" class="modal hidden" role="dialog" aria-label="جدول المساحات"></div>
+    <div id="walk-hint" class="hidden"></div>
+    <div id="loading">جارٍ بناء النموذج…</div>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

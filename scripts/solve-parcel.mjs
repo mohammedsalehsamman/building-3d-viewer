@@ -1,0 +1,149 @@
+// Solves the exact plan coordinates of parcel 2310/4 from the survey drawing.
+// Inputs: edge lengths written on the plan + net area 529 m².
+// Start: points digitized from the photo (pixels / 8.5 px per metre, y flipped).
+// Output: src/config/parcel.js
+import { writeFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, resolve } from 'node:path';
+
+const PX_PER_M = 8.5;
+const digitized = {
+  P2: [190, 690],
+  P7: [275, 595],
+  P6: [460, 650],
+  P5: [416, 763],
+  P4: [380, 855],
+  P3: [345, 850],
+};
+const TARGET = {
+  '2-7': 13.54, // internal 10 m road
+  '7-6': 22.45, // shared boundary with 2310/3
+  '6-5': 13.18,
+  '5-4': 10.81,
+  '3-2': 26.24,
+  area: 529,
+};
+const ARC_SEGMENTS = 10;
+
+const names = ['P2', 'P7', 'P6', 'P5', 'P4', 'P3'];
+let x = [];
+for (const n of names) {
+  const [px, py] = digitized[n];
+  x.push(px / PX_PER_M, -py / PX_PER_M);
+}
+const x0 = x.slice();
+const pt = (v, n) => { const i = names.indexOf(n) * 2; return [v[i], v[i + 1]]; };
+const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
+
+function lineIntersect(a, b, c, d) {
+  const r = [b[0] - a[0], b[1] - a[1]], s = [d[0] - c[0], d[1] - c[1]];
+  const den = r[0] * s[1] - r[1] * s[0];
+  if (Math.abs(den) < 1e-9) return [(b[0] + c[0]) / 2, (b[1] + c[1]) / 2];
+  const t = ((c[0] - a[0]) * s[1] - (c[1] - a[1]) * s[0]) / den;
+  return [a[0] + t * r[0], a[1] + t * r[1]];
+}
+
+// Corner 3↔4 is a fillet: quadratic Bezier with control at the intersection of lines 2→3 and 5→4.
+function arc(v) {
+  const P3 = pt(v, 'P3'), P4 = pt(v, 'P4');
+  const V = lineIntersect(pt(v, 'P2'), P3, pt(v, 'P5'), P4);
+  const out = [];
+  for (let i = 1; i < ARC_SEGMENTS; i++) {
+    const t = i / ARC_SEGMENTS, u = 1 - t;
+    out.push([u * u * P4[0] + 2 * u * t * V[0] + t * t * P3[0], u * u * P4[1] + 2 * u * t * V[1] + t * t * P3[1]]);
+  }
+  return { pts: out, V };
+}
+
+function polygon(v) {
+  // order: 2 → 7 → 6 → 5 → 4 → (arc) → 3
+  return [pt(v, 'P2'), pt(v, 'P7'), pt(v, 'P6'), pt(v, 'P5'), pt(v, 'P4'), ...arc(v).pts, pt(v, 'P3')];
+}
+function area(poly) {
+  let s = 0;
+  for (let i = 0; i < poly.length; i++) {
+    const a = poly[i], b = poly[(i + 1) % poly.length];
+    s += a[0] * b[1] - b[0] * a[1];
+  }
+  return s / 2;
+}
+
+function energy(v) {
+  const P = (n) => pt(v, n);
+  let e = 0;
+  e += (dist(P('P2'), P('P7')) - TARGET['2-7']) ** 2;
+  e += (dist(P('P7'), P('P6')) - TARGET['7-6']) ** 2;
+  e += (dist(P('P6'), P('P5')) - TARGET['6-5']) ** 2;
+  e += (dist(P('P5'), P('P4')) - TARGET['5-4']) ** 2;
+  e += (dist(P('P3'), P('P2')) - TARGET['3-2']) ** 2;
+  e += 0.01 * (Math.abs(area(polygon(v))) - TARGET.area) ** 2;
+  // fillet: equal tangent lengths
+  const { V } = arc(v);
+  e += 0.5 * (dist(V, P('P3')) - dist(V, P('P4'))) ** 2;
+  // stay close to the drawing's shape (weak)
+  for (let i = 0; i < v.length; i++) e += 0.002 * (v[i] - x0[i]) ** 2;
+  return e;
+}
+
+// gradient descent with numeric gradient
+let step = 0.02;
+let E = energy(x);
+for (let it = 0; it < 200000 && E > 1e-10; it++) {
+  const g = x.map((_, i) => {
+    const h = 1e-6, xp = x.slice(), xm = x.slice();
+    xp[i] += h; xm[i] -= h;
+    return (energy(xp) - energy(xm)) / (2 * h);
+  });
+  const xn = x.map((xi, i) => xi - step * g[i]);
+  const En = energy(xn);
+  if (En < E) { x = xn; E = En; step *= 1.1; } else { step *= 0.5; }
+  if (step < 1e-14) break;
+}
+
+// translate so that the parcel centroid is at the origin
+const poly = polygon(x);
+let cx = 0, cy = 0, A = 0;
+for (let i = 0; i < poly.length; i++) {
+  const a = poly[i], b = poly[(i + 1) % poly.length];
+  const c = a[0] * b[1] - b[0] * a[1];
+  A += c; cx += (a[0] + b[0]) * c; cy += (a[1] + b[1]) * c;
+}
+A /= 2; cx /= 6 * A; cy /= 6 * A;
+const r = (p) => [+(p[0] - cx).toFixed(4), +(p[1] - cy).toFixed(4)];
+
+const points = Object.fromEntries(names.map((n) => [n.slice(1), r(pt(x, n))]));
+const arcPts = arc(x).pts.map(r);
+const report = {
+  '2-7': dist(pt(x, 'P2'), pt(x, 'P7')),
+  '7-6': dist(pt(x, 'P7'), pt(x, 'P6')),
+  '6-5': dist(pt(x, 'P6'), pt(x, 'P5')),
+  '5-4': dist(pt(x, 'P5'), pt(x, 'P4')),
+  '3-2': dist(pt(x, 'P3'), pt(x, 'P2')),
+  'chord 3-4': dist(pt(x, 'P3'), pt(x, 'P4')),
+  area: Math.abs(area(poly)),
+};
+console.log('Edge / target / error (m)');
+let ok = true;
+for (const k of Object.keys(report)) {
+  const t = TARGET[k];
+  const err = t != null ? report[k] - t : null;
+  if (err != null && Math.abs(err) > (k === 'area' ? 2 : 0.05)) ok = false;
+  console.log(`  ${k.padEnd(10)} ${report[k].toFixed(3).padStart(8)}  ${t != null ? t.toFixed(2).padStart(7) : '      -'}  ${err != null ? err.toFixed(3) : ''}`);
+}
+console.log(ok ? 'OK — within tolerance' : 'WARNING — out of tolerance');
+
+const outline = [points['2'], points['7'], points['6'], points['5'], points['4'], ...arcPts, points['3']];
+const out = {
+  note: 'Plan coordinates (m) in the survey drawing frame (x right, y up on the photo), centred on the parcel centroid. Generated by scripts/solve-parcel.mjs',
+  points,
+  outline,
+  // index of each original point inside outline
+  outlineIndex: { 2: 0, 7: 1, 6: 2, 5: 3, 4: 4, 3: outline.length - 1 },
+  edges: report,
+};
+const here = dirname(fileURLToPath(import.meta.url));
+writeFileSync(
+  resolve(here, '../src/config/parcel.js'),
+  '// Generated by scripts/solve-parcel.mjs — do not edit by hand\nexport default ' + JSON.stringify(out, null, 2) + ';\n',
+);
+console.log('wrote src/config/parcel.js');
